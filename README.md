@@ -5,115 +5,100 @@ Production-grade incident response workflow with intelligent service validation 
 ## 🔄 End-to-End Workflow Architecture
 
 ```mermaid
-graph TB
-    subgraph "Development Phase"
-        A[Python DSL Code] --> B[IncidentWorkflow Class]
-        B --> C[Configuration Schema]
-        C --> D[Workflow Steps Definition]
-    end
+flowchart TD
+    %% Development Phase
+    A[Python DSL Code] --> B[IncidentWorkflow Class]
+    B --> C[Configuration Schema]
+    C --> D[Workflow Steps Definition]
     
-    subgraph "Compilation Phase"
-        D --> E[CLI Export Command]
-        E --> F{Export Format}
-        F -->|JSON| G[workflow.json]
-        F -->|YAML| H[workflow.yaml]
-    end
+    %% Compilation Phase
+    D --> E[CLI Export Command]
+    E --> F{Export Format}
+    F -->|JSON| G[workflow.json]
+    F -->|YAML| H[workflow.yaml]
     
-    subgraph "Kubiya Platform Integration"
-        G --> I[compose.kubiya.ai/workflow/designer]
-        H --> I
-        I --> J[Visual Workflow Editor]
-        J --> K[Modified Workflow]
-        K --> L[Platform Deployment]
-    end
+    %% Kubiya Platform Integration
+    G --> I[compose.kubiya.ai/workflow/designer]
+    H --> I
+    I --> J[Visual Workflow Editor]
+    J --> K[Modified Workflow]
+    K --> L[Platform Deployment]
     
-    subgraph "MCP Server Integration"
-        L --> M[Kubiya MCP Server]
-        M --> N[Agent Access Layer]
-        N --> O[AI Agents Can Call Workflow]
-    end
+    %% MCP Server Integration
+    L --> M[Kubiya MCP Server]
+    M --> N[Agent Access Layer]
+    N --> O[AI Agents Can Call Workflow]
     
-    subgraph "Runtime Execution"
-        O --> P{Trigger Source}
-        P -->|Agent Call| Q[Agent-Triggered Execution]
-        P -->|Direct API| R[Direct API Execution]
-        P -->|Monitoring Alert| S[Alert-Triggered Execution]
-        
-        Q --> T[Workflow Engine]
-        R --> T
-        S --> T
-        
-        T --> U[Step Execution]
-        U --> V[Kubernetes Validation]
-        U --> W[Slack Notifications]
-        U --> X[Service Discovery]
-    end
+    %% Runtime Execution
+    O --> P{Trigger Source}
+    P -->|Agent Call| Q[Agent-Triggered Execution]
+    P -->|Direct API| R[Direct API Execution]
+    P -->|Monitoring Alert| S[Alert-Triggered Execution]
     
-    subgraph "Conditional Logic"
-        V --> Y{Services Provided?}
-        Y -->|Yes| Z[Execute Incident Steps]
-        Y -->|No| AA[Create Service Agent]
-        AA --> BB[Agent Helps Discover Services]
-        BB --> CC[Re-trigger with Services]
-        CC --> Z
-    end
+    Q --> T[Workflow Engine]
+    R --> T
+    S --> T
     
-    subgraph "Output & Integration"
-        Z --> DD[Slack Updates]
-        Z --> EE[Incident Dashboard]
-        Z --> FF[Kubernetes Actions]
-        DD --> GG[Team Notification]
-        EE --> HH[Status Tracking]
-        FF --> II[Service Recovery]
-    end
-
-    classDef development fill:#e1f5fe
-    classDef compilation fill:#f3e5f5
-    classDef platform fill:#e8f5e8
-    classDef runtime fill:#fff3e0
-    classDef conditional fill:#fce4ec
-    classDef output fill:#f1f8e9
+    T --> U[Step Execution]
+    U --> V[Kubernetes Validation]
+    U --> W[Slack Notifications]
+    U --> X[Service Discovery]
     
-    class A,B,C,D development
-    class E,F,G,H compilation
-    class I,J,K,L,M,N,O platform
-    class P,Q,R,S,T,U,V,W runtime
-    class Y,Z,AA,BB,CC conditional
-    class DD,EE,FF,GG,HH,II output
+    %% Conditional Logic
+    V --> Y{Services Provided?}
+    Y -->|Yes| Z[Execute Incident Steps]
+    Y -->|No| AA[Create Service Agent]
+    AA --> BB[Agent Helps Discover Services]
+    BB --> CC[Re-trigger with Services]
+    CC --> Z
+    
+    %% Output
+    Z --> DD[Slack Updates]
+    Z --> EE[Incident Dashboard]
+    Z --> FF[Kubernetes Actions]
 ```
 
-## 🏗️ Workflow Components Architecture
+## 🏗️ Workflow Steps Flow
 
 ```mermaid
-graph LR
-    subgraph "DSL Components"
-        A[IncidentConfig] --> B[Validation Rules]
-        A --> C[Environment Variables]
-        A --> D[Service Parameters]
+flowchart LR
+    A[1. Validate Incident] --> B[2. Setup Slack]
+    B --> C{Services Known?}
+    C -->|No| D[3. Create Agent]
+    C -->|Yes| E[4. Post Alert]
+    D --> F[5. Agent Notification]
+    E --> G[6. Execute Response]
+    F --> H[7. Wait for Discovery]
+    G --> I[8. Monitor & Update]
+```
+
+## 📊 MCP Server Integration
+
+```mermaid
+sequenceDiagram
+    participant A as AI Agent
+    participant M as Kubiya MCP Server
+    participant W as Incident Workflow
+    participant K as Kubernetes
+    participant S as Slack API
+
+    A->>M: Call incident-response tool
+    M->>W: Trigger workflow execution
+    W->>W: Validate parameters
+    
+    alt Services provided
+        W->>S: Post incident alert
+        W->>K: Validate services
+        W->>S: Update with status
+    else Services unknown
+        W->>M: Create service validation agent
+        M->>A: New agent available
+        A->>K: Discover services
+        A->>M: Re-trigger with services
+        M->>W: Execute with validated services
     end
     
-    subgraph "Workflow Steps"
-        E[1. Validate Incident] --> F[2. Setup Slack]
-        F --> G[3. Service Check]
-        G --> H{Services Known?}
-        H -->|No| I[4a. Create Agent]
-        H -->|Yes| J[4b. Post Alert]
-        I --> K[5a. Agent Notification]
-        J --> L[5b. Execute Response]
-        K --> M[6. Wait for Discovery]
-        L --> N[6. Monitor & Update]
-    end
-    
-    subgraph "Integration Points"
-        O[Kubernetes API] --> P[Service Discovery]
-        Q[Slack API] --> R[Real-time Updates]
-        S[Kubiya MCP] --> T[Agent Integration]
-    end
-    
-    B --> E
-    P --> G
-    R --> F
-    T --> I
+    W->>A: Return execution results
 ```
 
 ## 🚀 Quick Start
@@ -168,33 +153,6 @@ python -m kubiya_incident.cli export \
    - Configure triggers (webhooks, schedules, agent calls)
    - Set up environment variables and secrets
    - Enable MCP server integration for agent access
-
-#### MCP Server Integration
-
-```mermaid
-sequenceDiagram
-    participant Agent as AI Agent
-    participant MCP as Kubiya MCP Server
-    participant Workflow as Incident Workflow
-    participant K8s as Kubernetes
-    participant Slack as Slack API
-
-    Agent->>MCP: Call incident-response tool
-    MCP->>Workflow: Trigger workflow execution
-    Workflow->>Workflow: Validate parameters
-    alt Services provided
-        Workflow->>Slack: Post incident alert
-        Workflow->>K8s: Validate services
-        Workflow->>Slack: Update with status
-    else Services unknown
-        Workflow->>MCP: Create service validation agent
-        MCP->>Agent: New agent available
-        Agent->>K8s: Discover services
-        Agent->>MCP: Re-trigger with services
-        MCP->>Workflow: Execute with validated services
-    end
-    Workflow->>Agent: Return execution results
-```
 
 ### 4. Use with Kubiya CLI
 
@@ -269,51 +227,38 @@ python -m kubiya_incident.cli create-agent \
 
 ## 🔧 Workflow Customization
 
-### Modifying Workflow Steps
+### JSON Structure for Workflow Designer
 
-The workflow consists of 8 main steps that can be customized:
+The exported JSON follows the Kubiya Workflow SDK format:
 
-```mermaid
-flowchart TD
-    A[1. validate-incident] --> B[2. setup-slack-integration]
-    B --> C[3. handle-validation-failure]
-    B --> D[4. post-incident-alert]
-    C --> E[5. service-discovery-loop]
-    D --> F[6. kubernetes-investigation]
-    F --> G[7. notify-resolution-team]
-    G --> H[8. update-incident-status]
-    
-    style A fill:#ffeb3b
-    style B fill:#2196f3
-    style C fill:#ff9800
-    style D fill:#4caf50
-    style E fill:#9c27b0
-    style F fill:#f44336
-    style G fill:#607d8b
-    style H fill:#795548
+```json
+{
+  "name": "production-incident-workflow",
+  "description": "Automated incident response with service validation",
+  "params": {
+    "incident_id": "INC-123",
+    "incident_title": "Incident Title",
+    "incident_severity": "high",
+    "affected_services": "service1,service2"
+  },
+  "steps": [
+    {
+      "name": "validate-incident",
+      "description": "Validate incident parameters",
+      "executor": {"type": "command", "config": {}},
+      "command": "# Validation logic here",
+      "output": "validation_status"
+    }
+  ]
+}
 ```
 
-### Customization Points
-
-1. **Parameter Validation** (`validate-incident`):
-   - Modify required fields in `core/config.py`
-   - Add custom validation rules
-   - Change severity levels
-
-2. **Slack Integration** (`setup-slack-integration`):
-   - Customize notification templates
-   - Add different channels for different severities
-   - Modify message formatting
-
-3. **Service Discovery Logic** (`handle-validation-failure`):
-   - Customize agent creation parameters
-   - Modify service discovery tools
-   - Add custom Kubernetes queries
-
-4. **Alert Formatting** (`post-incident-alert`):
-   - Design custom Slack block layouts
-   - Add rich notifications
-   - Include dashboard links
+**Key Components for Designer:**
+- `name`: Workflow identifier
+- `description`: Human-readable description
+- `params`: Input parameters with default values
+- `steps`: Array of executable steps with dependencies
+- `executor`: Execution environment configuration
 
 ### Example: Adding Custom Step
 
@@ -377,39 +322,6 @@ docker run --rm \
 - `examples/workflow-basic.json` - Basic incident workflow
 - `examples/workflow-critical.json` - Critical incident template  
 - `examples/service-validation-agent.json` - Service validation agent config
-
-### JSON Structure for Workflow Designer
-
-The exported JSON follows the Kubiya Workflow SDK format:
-
-```json
-{
-  "name": "production-incident-workflow",
-  "description": "Automated incident response with service validation",
-  "params": {
-    "incident_id": "INC-123",
-    "incident_title": "Incident Title",
-    "incident_severity": "high",
-    "affected_services": "service1,service2"
-  },
-  "steps": [
-    {
-      "name": "validate-incident",
-      "description": "Validate incident parameters",
-      "executor": {"type": "command", "config": {}},
-      "command": "# Validation logic here",
-      "output": "validation_status"
-    }
-  ]
-}
-```
-
-**Key Components for Designer:**
-- `name`: Workflow identifier
-- `description`: Human-readable description
-- `params`: Input parameters with default values
-- `steps`: Array of executable steps with dependencies
-- `executor`: Execution environment configuration
 
 ## 🎯 Integration
 
