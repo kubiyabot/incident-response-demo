@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 from kubiya_workflow_sdk.dsl import Workflow
 
-from ..agents.service_validator import ServiceValidationAgent
-from ..core.config import IncidentConfig
+from agents.service_validator import ServiceValidationAgent
+from core.config import IncidentConfig
 
 
 class IncidentResponseWorkflow:
