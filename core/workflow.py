@@ -8,9 +8,9 @@ from typing import Any, Dict, Optional
 import requests
 from kubiya_workflow_sdk.dsl import Workflow
 
-from ..agents.service_validator import ServiceValidationAgent
-from ..workflows.incident_response import IncidentResponseWorkflow
-from .config import IncidentConfig
+from agents.service_validator import ServiceValidationAgent
+from workflows.incident_response import IncidentResponseWorkflow
+from core.config import IncidentConfig
 
 
 class IncidentWorkflow:

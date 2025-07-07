@@ -7,8 +7,8 @@ import argparse
 import json
 import sys
 
-from .core.config import IncidentConfig
-from .core.workflow import IncidentWorkflow
+from core.config import IncidentConfig
+from core.workflow import IncidentWorkflow
 
 
 def create_parser() -> argparse.ArgumentParser:

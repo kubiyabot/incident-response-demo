@@ -1,6 +1,6 @@
 """Core components for incident response workflows."""
 
-from .config import IncidentConfig
-from .workflow import IncidentWorkflow
+from core.config import IncidentConfig
+from core.workflow import IncidentWorkflow
 
 __all__ = ["IncidentConfig", "IncidentWorkflow"]

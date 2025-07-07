@@ -4,9 +4,9 @@ Service validation agent for incident response workflows.
 
 from typing import Any, Dict, List
 
-from ..core.config import IncidentConfig
-from ..tools.kubernetes_tools import KubernetesToolDefinitions
-from ..tools.workflow_tools import WorkflowRetriggerTool
+from core.config import IncidentConfig
+from tools.kubernetes_tools import KubernetesToolDefinitions
+from tools.workflow_tools import WorkflowRetriggerTool
 
 
 class ServiceValidationAgent:
