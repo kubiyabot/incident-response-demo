@@ -1,0 +1,148 @@
+{
+  "name": "incident-service-validator-INC-SERVICE-001",
+  "description": "AI agent for validating Kubernetes service names and re-triggering incident workflow INC-SERVICE-001",
+  "instructions": "\nYou are an expert incident response agent specialized in validating Kubernetes service names and re-triggering workflows.\n\n**INCIDENT CONTEXT:**\n- Incident ID: INC-SERVICE-001\n- Title: Service Validation Check\n- Severity: high\n- Description: Incident: Service Validation Check\n\n**YOUR RESPONSIBILITIES:**\n1. **Service Discovery**: Help users discover available Kubernetes services in the cluster\n2. **Service Validation**: Validate that provided service names exist in the cluster\n3. **Pattern Matching**: Help users find services using partial names or patterns\n4. **Workflow Re-triggering**: Re-trigger incident workflows with validated service information\n\n**WORKFLOW STEPS:**\n1. **Start with Discovery**: Use `kubectl_get_services` to show all available services\n2. **Validate Specific Services**: Use `validate_service_exists` to confirm services exist\n3. **Provide Recommendations**: If services don't exist, suggest similar or related services\n4. **Confirm Before Re-trigger**: Always confirm with the user before re-triggering workflows\n5. **Execute Re-trigger**: Use `workflow_retrigger` with validated service names\n\n**TOOL USAGE GUIDELINES:**\n\n**kubectl_get_services:**\n- Use this first to show all available services\n- Use with service_pattern parameter to search for specific patterns\n- This helps users see what services are available\n\n**validate_service_exists:**\n- Use this to validate specific service names provided by users\n- Specify namespace if known, otherwise it will search all namespaces\n- This confirms that services actually exist\n\n**kubectl_cluster_investigation:**\n- Use this to get comprehensive cluster health information\n- Helps identify related services or infrastructure issues\n- Use when users need broader cluster context\n\n**helm_deployments_check:**\n- Use this to check recent deployments that might be related to the incident\n- Helpful for understanding recent changes that could cause issues\n\n**workflow_retrigger:**\n- Use this ONLY after validating service names\n- Requires the `validated_service_name` parameter\n- This creates a new focused incident workflow\n\n**EXAMPLE INTERACTION:**\nUser: \"I think the service is called user-api but I'm not sure\"\n\n1. You: \"Let me help you find the correct service name. First, let me show you all available services.\"\n2. Use: kubectl_get_services (to list all services)\n3. You: \"I can see several services. Let me check if 'user-api' exists specifically.\"\n4. Use: validate_service_exists with service_name=\"user-api\"\n5. If found: \"Great! I found the user-api service. Should I re-trigger the incident workflow with this validated service?\"\n6. If not found: \"I didn't find 'user-api', but I see similar services like 'user-service' and 'api-gateway'. Which one would you like me to check?\"\n7. After confirmation: Use workflow_retrigger with validated_service_name=\"user-api\"\n\n**IMPORTANT NOTES:**\n- Always be helpful and patient with users who may not know exact service names\n- Provide clear explanations of what you're doing and why\n- Always confirm before re-triggering workflows - this creates a new workflow execution\n- If users are unsure, show them options and let them choose\n- The workflow_retrigger tool will create a complete new incident workflow focused on the validated services\n\n**SAFETY RULES:**\n- Never re-trigger workflows without user confirmation\n- Always validate service names before re-triggering\n- If you're unsure about a service name, ask the user to clarify\n- Explain what the re-trigger will do before executing it\n\nBe helpful, accurate, and always prioritize getting the correct service information before proceeding with workflow re-triggers.\n        ",
+  "tools": [
+    {
+      "name": "kubectl_get_services",
+      "description": "Get all services in the Kubernetes cluster to validate service names and discover available services",
+      "type": "docker",
+      "image": "bitnami/kubectl:latest",
+      "content": "#!/bin/bash\nset -e\n\necho \"\ud83d\udd0d KUBERNETES SERVICES DISCOVERY\"\necho \"=================================\"\n\n# Get all services with detailed information\necho \"\ud83d\udccb All services across all namespaces:\"\nkubectl get services --all-namespaces -o wide --show-labels\n\necho \"\"\necho \"\ud83d\udcca Service summary by namespace:\"\nkubectl get services --all-namespaces --no-headers | awk '{print $1}' | sort | uniq -c | sort -nr\n\n# Search for specific pattern if provided\nif [ -n \"$SERVICE_PATTERN\" ]; then\n    echo \"\"\n    echo \"\ud83d\udd0d Searching for services matching pattern: '$SERVICE_PATTERN'\"\n    kubectl get services --all-namespaces | grep -i \"$SERVICE_PATTERN\" || echo \"\u274c No services found matching pattern: $SERVICE_PATTERN\"\n    \n    echo \"\"\n    echo \"\ud83d\udd0d Similar service names (fuzzy search):\"\n    kubectl get services --all-namespaces --no-headers | awk '{print $2}' | grep -i \"$(echo $SERVICE_PATTERN | cut -c1-3)\" || echo \"No similar services found\"\nfi\n\necho \"\"\necho \"\u2705 Services discovery completed\"\n            ",
+      "args": {
+        "SERVICE_PATTERN": "{{service_pattern}}"
+      }
+    },
+    {
+      "name": "validate_service_exists",
+      "description": "Validate if a specific service exists in the Kubernetes cluster",
+      "type": "docker",
+      "image": "bitnami/kubectl:latest",
+      "content": "#!/bin/bash\nset -e\n\necho \"\ud83d\udd0d VALIDATING SERVICE: $SERVICE_NAME\"\necho \"====================================\"\n\nNAMESPACE=${NAMESPACE:-default}\nFOUND=false\n\n# Check in specified namespace first\necho \"\ud83d\udd0d Checking namespace: $NAMESPACE\"\nif kubectl get service \"$SERVICE_NAME\" -n \"$NAMESPACE\" 2>/dev/null; then\n    echo \"\u2705 Service '$SERVICE_NAME' found in namespace '$NAMESPACE'\"\n    FOUND=true\n    \n    # Get detailed service information\n    echo \"\"\n    echo \"\ud83d\udccb Service details:\"\n    kubectl describe service \"$SERVICE_NAME\" -n \"$NAMESPACE\"\n    \n    echo \"\"\n    echo \"\ud83d\udd17 Service endpoints:\"\n    kubectl get endpoints \"$SERVICE_NAME\" -n \"$NAMESPACE\" 2>/dev/null || echo \"No endpoints found\"\nelse\n    echo \"\u274c Service '$SERVICE_NAME' not found in namespace '$NAMESPACE'\"\nfi\n\n# If not found in specified namespace, search all namespaces\nif [ \"$FOUND\" = \"false\" ]; then\n    echo \"\"\n    echo \"\ud83d\udd0d Searching across all namespaces...\"\n    ALL_MATCHES=$(kubectl get services --all-namespaces --no-headers | grep \"$SERVICE_NAME\" || true)\n    \n    if [ -n \"$ALL_MATCHES\" ]; then\n        echo \"\u2705 Found matching services:\"\n        echo \"$ALL_MATCHES\"\n        FOUND=true\n    else\n        echo \"\u274c Service '$SERVICE_NAME' not found in any namespace\"\n        \n        # Suggest similar services\n        echo \"\"\n        echo \"\ud83d\udca1 Similar service names found:\"\n        kubectl get services --all-namespaces --no-headers | awk '{print $1 \":\" $2}' | grep -i \"$(echo $SERVICE_NAME | cut -c1-3)\" | head -5 || echo \"No similar services found\"\n    fi\nfi\n\nif [ \"$FOUND\" = \"true\" ]; then\n    echo \"\"\n    echo \"\u2705 Service validation successful\"\n    exit 0\nelse\n    echo \"\"\n    echo \"\u274c Service validation failed\"\n    exit 1\nfi\n            ",
+      "args": {
+        "SERVICE_NAME": "{{service_name}}",
+        "NAMESPACE": "{{namespace:default}}"
+      }
+    },
+    {
+      "name": "kubectl_cluster_investigation",
+      "description": "Perform comprehensive Kubernetes cluster investigation for incident analysis",
+      "type": "docker",
+      "image": "bitnami/kubectl:latest",
+      "content": "#!/bin/bash\nset -e\n\necho \"\ud83d\udd0d KUBERNETES CLUSTER INVESTIGATION\"\necho \"====================================\"\n\nSERVICES=${AFFECTED_SERVICES:-\"all\"}\necho \"\ud83c\udfaf Investigating services: $SERVICES\"\n\necho \"\"\necho \"1\ufe0f\u20e3 CLUSTER OVERVIEW\"\necho \"===================\"\necho \"\ud83d\udcca Node status:\"\nkubectl get nodes -o wide\n\necho \"\"\necho \"\ud83d\udcca Namespace overview:\" \nkubectl get namespaces\n\necho \"\"\necho \"2\ufe0f\u20e3 POD HEALTH ANALYSIS\"\necho \"=======================\"\necho \"\ud83d\udd0d Pods with high restart counts (>5):\"\nkubectl get pods --all-namespaces --field-selector=status.phase=Running | awk 'NR>1 && $5>5 {print $0}' || echo \"No pods with high restart counts found\"\n\necho \"\"\necho \"\ud83d\udd0d Failed/Pending pods:\"\nkubectl get pods --all-namespaces --field-selector=status.phase!=Running,status.phase!=Succeeded | head -20\n\necho \"\"\necho \"3\ufe0f\u20e3 SERVICE-SPECIFIC INVESTIGATION\"\necho \"==================================\"\nif [ \"$SERVICES\" != \"all\" ]; then\n    IFS=',' read -ra SERVICE_ARRAY <<< \"$SERVICES\"\n    for service in \"${SERVICE_ARRAY[@]}\"; do\n        service=$(echo \"$service\" | xargs)  # trim whitespace\n        echo \"\"\n        echo \"\ud83d\udd0d Investigating service: $service\"\n        \n        # Find pods for this service\n        kubectl get pods --all-namespaces -l app=$service -o wide 2>/dev/null || echo \"No pods found with label app=$service\"\n        \n        # Check service endpoints\n        kubectl get services --all-namespaces | grep \"$service\" || echo \"Service $service not found\"\n    done\nfi\n\necho \"\"\necho \"4\ufe0f\u20e3 RECENT EVENTS\"\necho \"=================\"\necho \"\ud83d\udd0d Recent cluster events (last 1 hour):\"\nkubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20\n\necho \"\"\necho \"5\ufe0f\u20e3 RESOURCE UTILIZATION\"\necho \"========================\"\necho \"\ud83d\udcca Node resource usage:\"\nkubectl top nodes 2>/dev/null || echo \"Metrics server not available\"\n\necho \"\"\necho \"\ud83d\udcca Top resource-consuming pods:\"\nkubectl top pods --all-namespaces --sort-by=memory 2>/dev/null | head -10 || echo \"Metrics server not available\"\n\necho \"\"\necho \"\u2705 Cluster investigation completed\"\n            ",
+      "args": {
+        "AFFECTED_SERVICES": "{{affected_services}}"
+      }
+    },
+    {
+      "name": "helm_deployments_check",
+      "description": "Check recent Helm deployments that might be related to the incident",
+      "type": "docker",
+      "image": "alpine/helm:latest",
+      "content": "#!/bin/bash\nset -e\n\necho \"\ud83d\udd0d HELM DEPLOYMENTS ANALYSIS\"\necho \"=============================\"\n\n# Install kubectl in helm image\napk add --no-cache curl\ncurl -LO \"https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\"\nchmod +x kubectl\nmv kubectl /usr/local/bin/\n\necho \"\ud83d\udccb All Helm releases:\"\nhelm list --all-namespaces\n\necho \"\"\necho \"\ud83d\udd0d Recent Helm deployments (last 6 hours):\"\nhelm list --all-namespaces --date --output json | jq -r '.[] | select(.updated | strptime(\"%Y-%m-%d %H:%M:%S.%f %z\") > (now - 6*3600)) | \"\\(.name) (\\(.namespace)) - \\(.updated) - \\(.status)\"' 2>/dev/null || echo \"No recent deployments found or jq not available\"\n\necho \"\"\necho \"\ud83d\udd0d Failed Helm releases:\"\nhelm list --all-namespaces --failed\n\necho \"\"\necho \"\ud83d\udcca Helm release status summary:\"\nhelm list --all-namespaces --output json | jq -r 'group_by(.status) | .[] | \"\\(.[0].status): \\(length) releases\"' 2>/dev/null || echo \"Status summary not available\"\n\necho \"\"\necho \"\u2705 Helm analysis completed\"\n            ",
+      "args": {}
+    },
+    {
+      "name": "workflow_retrigger",
+      "description": "Re-trigger the incident workflow with validated service information using the Kubiya Workflow API",
+      "type": "http",
+      "url": "https://api.kubiya.ai/api/v1/workflow?runner=gke-integration&operation=execute_workflow",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "UserKey {{KUBIYA_API_KEY}}",
+        "Accept": "text/event-stream"
+      },
+      "body": {
+        "command": "execute_workflow",
+        "name": "incident-response-retrigger-{{INCIDENT_ID}}",
+        "description": "Re-triggered incident response with validated service: {{validated_service_name}}",
+        "env": {
+          "KUBIYA_API_KEY": "{{KUBIYA_API_KEY}}",
+          "KUBIYA_USER_EMAIL": "{{KUBIYA_USER_EMAIL}}",
+          "KUBIYA_USER_ORG": "{{KUBIYA_USER_ORG}}"
+        },
+        "params": {
+          "incident_id": "{{INCIDENT_ID}}",
+          "incident_title": "{{INCIDENT_TITLE}}",
+          "incident_severity": "{{INCIDENT_SEVERITY}}",
+          "incident_body": "{{INCIDENT_BODY}}",
+          "incident_url": "{{INCIDENT_URL}}",
+          "slack_channel_id": "{{SLACK_CHANNEL_ID}}",
+          "affected_services": "{{validated_service_name}}",
+          "incident_priority": "medium",
+          "incident_source": "agent-validated",
+          "incident_owner": "{{KUBIYA_USER_EMAIL}}",
+          "customer_impact": "partial"
+        },
+        "steps": [
+          {
+            "name": "validated-incident-alert",
+            "description": "Send validated incident alert to Slack",
+            "executor": {
+              "type": "kubiya",
+              "config": {
+                "url": "api/v1/integration/slack/token/1",
+                "method": "GET",
+                "timeout": 30
+              }
+            },
+            "output": "slack_token"
+          },
+          {
+            "name": "post-validated-alert",
+            "description": "Post alert with validated service information",
+            "executor": {
+              "type": "command",
+              "config": {}
+            },
+            "command": "echo '\u2705 INCIDENT WORKFLOW RE-TRIGGERED' && echo 'Incident ID: {{INCIDENT_ID}}' && echo 'Validated Services: {{validated_service_name}}' && echo 'Starting targeted investigation...' && curl -X POST https://slack.com/api/chat.postMessage -H \"Authorization: Bearer ${slack_token.token}\" -H \"Content-Type: application/json\" -d '{\"channel\": \"{{SLACK_CHANNEL_ID}}\", \"text\": \"\u2705 INCIDENT RE-TRIGGERED\", \"attachments\": [{\"color\": \"good\", \"blocks\": [{\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"\u2705 INCIDENT VALIDATED & RE-TRIGGERED\"}}, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"*{{INCIDENT_TITLE}}*\"}}, {\"type\": \"section\", \"fields\": [{\"type\": \"mrkdwn\", \"text\": \"*\ud83c\udd94 ID:*\\n{{INCIDENT_ID}}\"}, {\"type\": \"mrkdwn\", \"text\": \"*\ud83d\udd25 Severity:*\\n{{INCIDENT_SEVERITY}}\"}, {\"type\": \"mrkdwn\", \"text\": \"*\ud83c\udfaf Validated Services:*\\n{{validated_service_name}}\"}, {\"type\": \"mrkdwn\", \"text\": \"*\ud83e\udd16 Source:*\\nAgent Validated\"}]}, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"*\ud83d\udcdd Description:*\\n{{INCIDENT_BODY}}\"}}]}]}'",
+            "depends": [
+              "validated-incident-alert"
+            ],
+            "output": "validated_alert"
+          },
+          {
+            "name": "investigate-validated-services",
+            "description": "AI investigation focused on validated services",
+            "executor": {
+              "type": "agent",
+              "config": {
+                "agent_name": "incident-responder",
+                "message": "**VALIDATED KUBERNETES INCIDENT INVESTIGATION**\\n\\n**INCIDENT DETAILS:**\\n\u2022 **ID:** {{INCIDENT_ID}}\\n\u2022 **Title:** {{INCIDENT_TITLE}}\\n\u2022 **Severity:** {{INCIDENT_SEVERITY}} (URGENT)\\n\u2022 **Description:** {{INCIDENT_BODY}}\\n\u2022 **Validated Services:** {{validated_service_name}}\\n\u2022 **Dashboard URL:** {{INCIDENT_URL}}\\n\\n**YOUR MISSION - FOCUS ON VALIDATED SERVICES:**\\nPerform targeted investigation for the validated services: {{validated_service_name}}\\n\\n**1. SERVICE-SPECIFIC INVESTIGATION**\\n- Check the health and status of {{validated_service_name}}\\n- Analyze recent deployments affecting these services\\n- Review logs and metrics for these specific services\\n\\n**2. KUBERNETES CLUSTER ANALYSIS**\\n- Check pods, deployments, and services related to {{validated_service_name}}\\n- Verify resource utilization for these services\\n- Look for networking issues affecting these services\\n\\n**3. ROOT CAUSE ANALYSIS**\\n- Focus investigation on {{validated_service_name}}\\n- Identify specific issues with these validated services\\n- Provide targeted remediation steps\\n\\n**REQUIRED OUTPUT FORMAT:**\\n```\\n## \ud83c\udfaf VALIDATED SERVICE INVESTIGATION\\n[Focus on {{validated_service_name}}]\\n\\n## \ud83d\udd0d SERVICE STATUS\\n[Current status of {{validated_service_name}}]\\n\\n## \ud83d\udea8 ROOT CAUSE\\n[Primary cause affecting {{validated_service_name}}]\\n\\n## \u26a1 IMMEDIATE ACTIONS\\n1. [Specific action for {{validated_service_name}} - ETA]\\n2. [Additional remediation - ETA]\\n\\n## \ud83d\udcca IMPACT ASSESSMENT\\n[Business impact of {{validated_service_name}} issues]\\n```\\n\\n**START TARGETED INVESTIGATION NOW!**"
+              }
+            },
+            "depends": [
+              "post-validated-alert"
+            ],
+            "output": "investigation_results",
+            "timeout": 600,
+            "retries": 3
+          }
+        ]
+      }
+    }
+  ],
+  "model": "claude-3-5-sonnet-20241022",
+  "runner": "gke-integration",
+  "secrets": [
+    "KUBIYA_API_KEY"
+  ],
+  "env_vars": {
+    "INCIDENT_ID": "INC-SERVICE-001",
+    "INCIDENT_TITLE": "Service Validation Check",
+    "INCIDENT_SEVERITY": "high",
+    "INCIDENT_BODY": "Incident: Service Validation Check",
+    "INCIDENT_URL": "https://example.com/incidents/agent-test",
+    "SLACK_CHANNEL_ID": "#incidents",
+    "KUBIYA_USER_EMAIL": "${KUBIYA_USER_EMAIL}",
+    "KUBIYA_USER_ORG": "default"
+  },
+  "conversation_starters": [
+    "I need help validating services for incident INC-SERVICE-001",
+    "Show me all available services in the cluster",
+    "Help me find the correct service name for this incident",
+    "Validate service names for Service Validation Check",
+    "I'm not sure of the exact service name, can you help me find it?"
+  ]
+}

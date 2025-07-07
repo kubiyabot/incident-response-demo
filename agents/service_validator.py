@@ -2,31 +2,32 @@
 Service validation agent for incident response workflows.
 """
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+from ..core.config import IncidentConfig
 from ..tools.kubernetes_tools import KubernetesToolDefinitions
 from ..tools.workflow_tools import WorkflowRetriggerTool
-from ..core.config import IncidentConfig
 
 
 class ServiceValidationAgent:
     """AI agent for validating Kubernetes service names and re-triggering workflows."""
-    
+
     def __init__(self, config: IncidentConfig):
         """Initialize the service validation agent.
-        
+
         Args:
             config: Incident configuration containing all necessary parameters
         """
         self.config = config
         self.agent_name = f"incident-service-validator-{config.incident_id}"
-    
+
     def get_agent_tools(self) -> List[Dict[str, Any]]:
         """Get all tools for the service validation agent."""
         k8s_tools = KubernetesToolDefinitions.get_all_tools()
         workflow_tool = WorkflowRetriggerTool.create_retrigger_tool()
-        
+
         return k8s_tools + [workflow_tool]
-    
+
     def get_agent_config(self) -> Dict[str, Any]:
         """Generate complete agent configuration."""
         return {
@@ -40,7 +41,7 @@ class ServiceValidationAgent:
             "env_vars": self._get_agent_env_vars(),
             "conversation_starters": self._get_conversation_starters(),
         }
-    
+
     def _get_agent_instructions(self) -> str:
         """Get detailed instructions for the service validation agent."""
         return f"""
@@ -117,7 +118,7 @@ User: "I think the service is called user-api but I'm not sure"
 
 Be helpful, accurate, and always prioritize getting the correct service information before proceeding with workflow re-triggers.
         """
-    
+
     def _get_agent_env_vars(self) -> Dict[str, str]:
         """Get environment variables for the agent."""
         return {
@@ -130,7 +131,7 @@ Be helpful, accurate, and always prioritize getting the correct service informat
             "KUBIYA_USER_EMAIL": self.config.kubiya_user_email or "${KUBIYA_USER_EMAIL}",
             "KUBIYA_USER_ORG": self.config.kubiya_user_org or "${KUBIYA_USER_ORG}",
         }
-    
+
     def _get_conversation_starters(self) -> List[str]:
         """Get conversation starters for the agent."""
         return [

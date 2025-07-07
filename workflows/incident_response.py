@@ -2,43 +2,48 @@
 Main incident response workflow implementation.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from kubiya_workflow_sdk.dsl import Workflow
-from ..core.config import IncidentConfig
+
 from ..agents.service_validator import ServiceValidationAgent
+from ..core.config import IncidentConfig
 
 
 class IncidentResponseWorkflow:
     """Main incident response workflow with intelligent service validation."""
-    
+
     def __init__(self, config: IncidentConfig):
         """Initialize the incident response workflow.
-        
+
         Args:
             config: Incident configuration
         """
         self.config = config
         self.service_agent = ServiceValidationAgent(config)
-    
+
     def create_workflow(self) -> Workflow:
         """Create the complete incident response workflow."""
-        
+
         return (
             Workflow("production-incident-workflow")
-            .description("Production-grade incident response workflow with AI investigation and Slack integration")
+            .description(
+                "Production-grade incident response workflow with AI investigation and Slack integration"
+            )
             .env(**self.config.to_workflow_env())
             .params(**self.config.to_workflow_params())
             .runner(self.config.runner)
-            
             # Step 1: Validate incident parameters
-            .step("validate-incident", self._get_validation_command(),
+            .step(
+                "validate-incident",
+                self._get_validation_command(),
                 description="Validate incident parameters and prerequisites",
                 executor={"type": "command", "config": {}},
-                output="validation_status"
+                output="validation_status",
             )
-            
             # Step 2: Setup Slack integration
-            .step("setup-slack-integration",
+            .step(
+                "setup-slack-integration",
                 description="Initialize Slack integration for incident communications",
                 executor={
                     "type": "kubiya",
@@ -46,68 +51,73 @@ class IncidentResponseWorkflow:
                         "url": "api/v1/integration/slack/token/1",
                         "method": "GET",
                         "timeout": 30,
-                        "silent": False
-                    }
+                        "silent": False,
+                    },
                 },
                 depends=["validate-incident"],
-                output="slack_token"
+                output="slack_token",
             )
-            
             # Step 3: Handle validation failure (missing services)
-            .step("handle-validation-failure", self._get_validation_failure_command(),
+            .step(
+                "handle-validation-failure",
+                self._get_validation_failure_command(),
                 description="Send Slack notification when services are missing and create validation agent",
                 executor={"type": "command", "config": {}},
                 depends=["setup-slack-integration"],
-                output="validation_failure_message"
+                output="validation_failure_message",
             )
-            
             # Step 4: Post incident alert (only if services provided)
-            .step("post-incident-alert", self._get_incident_alert_command(),
+            .step(
+                "post-incident-alert",
+                self._get_incident_alert_command(),
                 description="Send beautiful incident alert to Slack when services are provided",
                 executor={"type": "command", "config": {}},
                 depends=["setup-slack-integration"],
-                output="initial_alert_message"
+                output="initial_alert_message",
             )
-            
             # Step 5: Notify investigation start
-            .step("notify-investigation-start", self._get_investigation_start_command(),
+            .step(
+                "notify-investigation-start",
+                self._get_investigation_start_command(),
                 description="Notify AI investigation start",
                 executor={"type": "command", "config": {}},
                 depends=["post-incident-alert"],
-                output="investigation_start_message"
+                output="investigation_start_message",
             )
-            
             # Step 6: AI-powered incident investigation
-            .step("investigate-incident-with-ai", 
+            .step(
+                "investigate-incident-with-ai",
                 description="AI-powered incident investigation",
                 executor={
                     "type": "agent",
                     "config": {
                         "agent_name": self.config.investigation_agent,
-                        "message": self._get_investigation_message()
-                    }
+                        "message": self._get_investigation_message(),
+                    },
                 },
                 depends=["notify-investigation-start"],
-                output="investigation_results"
+                output="investigation_results",
             )
-            
             # Step 7: Post investigation results (simplified - skip processing step)
-            .step("post-investigation-results", self._get_simple_post_results_command(),
+            .step(
+                "post-investigation-results",
+                self._get_simple_post_results_command(),
                 description="Post AI investigation completion notification to Slack",
                 executor={"type": "command", "config": {}},
                 depends=["investigate-incident-with-ai"],
-                output="investigation_results_message"
+                output="investigation_results_message",
             )
-            
             # Step 9: Post action summary
-            .step("post-action-summary", self._get_action_summary_command(),
+            .step(
+                "post-action-summary",
+                self._get_action_summary_command(),
                 description="Post actionable summary with next steps",
                 executor={"type": "command", "config": {}},
                 depends=["post-investigation-results"],
-                output="action_summary_message"
+                output="action_summary_message",
             )
         )
-    
+
     def _get_validation_command(self) -> str:
         """Get the incident validation command."""
         return """
@@ -172,15 +182,15 @@ else
   echo "⚠️ Continuing workflow to handle validation failure..."
 fi
         """
-    
+
     def _get_validation_failure_command(self) -> str:
         """Get the validation failure handling command."""
         agent_config = self.service_agent.get_agent_config()
-        agent_name = agent_config['name']
-        tools_count = len(agent_config['tools'])
-        
+        agent_name = agent_config["name"]
+        tools_count = len(agent_config["tools"])
+
         # Build command without nested f-strings
-        base_command = '''
+        base_command = """
 echo "🔍 DEBUG: handle-validation-failure step starting"
 echo "affected_services value: '${affected_services}'"
 
@@ -195,12 +205,12 @@ echo "🚨 VALIDATION FAILED - CREATING SERVICE VALIDATION AGENT"
 echo "Affected services is missing, creating agent to help with validation"
 
 echo "🤖 AGENT CONFIGURATION:"
-echo "Agent Name: '''
-        
-        middle_command = '''"
-echo "Tools Available: '''
-        
-        end_command = ''' tools"
+echo "Agent Name: """
+
+        middle_command = """"
+echo "Tools Available: """
+
+        end_command = """ tools"
 echo "- kubectl_get_services: List all cluster services"
 echo "- validate_service_exists: Validate specific services"
 echo "- kubectl_cluster_investigation: Comprehensive cluster analysis"
@@ -247,9 +257,9 @@ AGENT_MESSAGE='{
                 "text": "*🔥 Severity:*\\\\n${incident_severity}"
             }, {
                 "type": "mrkdwn",
-                "text": "*🤖 Agent:*\\\\n'''
-        
-        agent_field = '''"
+                "text": "*🤖 Agent:*\\\\n"""
+
+        agent_field = """"
             }, {
                 "type": "mrkdwn",
                 "text": "*🎯 Purpose:*\\\\nService validation & workflow re-trigger"
@@ -276,10 +286,18 @@ curl -X POST https://slack.com/api/chat.postMessage \\
   -d "$AGENT_MESSAGE"
 
 echo "✅ Service validation agent notification sent to Slack"
-        '''
-        
-        return base_command + agent_name + middle_command + str(tools_count) + end_command + agent_name + agent_field
-    
+        """
+
+        return (
+            base_command
+            + agent_name
+            + middle_command
+            + str(tools_count)
+            + end_command
+            + agent_name
+            + agent_field
+        )
+
     def _get_incident_alert_command(self) -> str:
         """Get the incident alert command."""
         return """
@@ -304,7 +322,7 @@ curl -X POST https://slack.com/api/chat.postMessage \\
 
 echo "✅ Beautiful incident alert posted to Slack"
         """
-    
+
     def _get_investigation_start_command(self) -> str:
         """Get the investigation start notification command."""
         return """
@@ -329,7 +347,7 @@ curl -X POST https://slack.com/api/chat.postMessage \\
 
 echo "✅ Beautiful investigation start notification posted to Slack"
         """
-    
+
     def _get_investigation_message(self) -> str:
         """Get the AI investigation message."""
         return """**AUTOMATED KUBERNETES INCIDENT INVESTIGATION**
@@ -393,7 +411,7 @@ Perform these targeted investigations using available k8s-cli, helm-cli, datadog
 - Provide actionable insights quickly
 
 **START FOCUSED INVESTIGATION NOW!**"""
-    
+
     def _get_process_results_command(self) -> str:
         """Get the process investigation results command."""
         return """
@@ -428,7 +446,7 @@ fi
 echo "📝 Investigation results ready for Slack posting"
 echo "✅ Investigation results processing completed"
         """
-    
+
     def _get_post_results_command(self) -> str:
         """Get the post investigation results command."""
         return """
@@ -480,10 +498,10 @@ curl -s -X POST https://slack.com/api/chat.postMessage \\
 # Post the actual investigation results as a code block (if file exists)
 if [ -f "/tmp/investigation_output.txt" ]; then
   echo "📝 Posting detailed investigation results..."
-  
+
   # Use base64 encoding to safely transfer the content
   base64 -w 0 /tmp/investigation_output.txt > /tmp/investigation_b64.txt
-  
+
   # Create a simple script to decode and post
   cat > /tmp/post_results.sh << 'EOF'
 #!/bin/bash
@@ -491,9 +509,9 @@ CONTENT=$(base64 -d /tmp/investigation_b64.txt)
 curl -s -X POST https://slack.com/api/chat.postMessage \\
   -H "Authorization: Bearer $1" \\
   -H "Content-Type: application/json" \\
-  -d "{\\"channel\\": \\"$2\\", \\"text\\": \\"📋 **Investigation Results:**\\\\n\\\`\\\`\\\`\\\\n\${CONTENT}\\\\n\\\`\\\`\\\`\\"}"
+  -d "{\\"channel\\": \\"$2\\", \\"text\\": \\"📋 **Investigation Results:**\\\\n\\`\\`\\`\\\\n${CONTENT}\\\\n\\`\\`\\`\\"}"
 EOF
-  
+
   chmod +x /tmp/post_results.sh
   /tmp/post_results.sh "${slack_token.token}" "${slack_channel_id}" || echo "📝 Fallback: Investigation completed with findings"
 else
@@ -509,7 +527,7 @@ fi
 
 echo "✅ Investigation results posted to Slack"
         """
-    
+
     def _get_simple_post_results_command(self) -> str:
         """Get a simplified post investigation results command that avoids variable substitution issues."""
         return """
@@ -567,7 +585,7 @@ curl -s -X POST https://slack.com/api/chat.postMessage \\
 echo "📝 Investigation completed successfully - detailed results generated"
 echo "✅ Investigation results notification posted to Slack"
         """
-    
+
     def _get_action_summary_command(self) -> str:
         """Get the action summary command."""
         return """

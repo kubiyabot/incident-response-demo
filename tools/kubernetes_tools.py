@@ -2,12 +2,12 @@
 Kubernetes tools for service validation and cluster investigation.
 """
 
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 class KubernetesToolDefinitions:
     """Kubernetes tool definitions for incident response agents."""
-    
+
     @staticmethod
     def kubectl_get_services() -> Dict[str, Any]:
         """Tool to get all services in the Kubernetes cluster."""
@@ -35,7 +35,7 @@ if [ -n "$SERVICE_PATTERN" ]; then
     echo ""
     echo "🔍 Searching for services matching pattern: '$SERVICE_PATTERN'"
     kubectl get services --all-namespaces | grep -i "$SERVICE_PATTERN" || echo "❌ No services found matching pattern: $SERVICE_PATTERN"
-    
+
     echo ""
     echo "🔍 Similar service names (fuzzy search):"
     kubectl get services --all-namespaces --no-headers | awk '{print $2}' | grep -i "$(echo $SERVICE_PATTERN | cut -c1-3)" || echo "No similar services found"
@@ -44,16 +44,14 @@ fi
 echo ""
 echo "✅ Services discovery completed"
             """,
-            "args": {
-                "SERVICE_PATTERN": "{{service_pattern}}"
-            }
+            "args": {"SERVICE_PATTERN": "{{service_pattern}}"},
         }
-    
+
     @staticmethod
     def validate_service_exists() -> Dict[str, Any]:
         """Tool to validate if a specific service exists."""
         return {
-            "name": "validate_service_exists", 
+            "name": "validate_service_exists",
             "description": "Validate if a specific service exists in the Kubernetes cluster",
             "type": "docker",
             "image": "bitnami/kubectl:latest",
@@ -71,12 +69,12 @@ echo "🔍 Checking namespace: $NAMESPACE"
 if kubectl get service "$SERVICE_NAME" -n "$NAMESPACE" 2>/dev/null; then
     echo "✅ Service '$SERVICE_NAME' found in namespace '$NAMESPACE'"
     FOUND=true
-    
+
     # Get detailed service information
     echo ""
     echo "📋 Service details:"
     kubectl describe service "$SERVICE_NAME" -n "$NAMESPACE"
-    
+
     echo ""
     echo "🔗 Service endpoints:"
     kubectl get endpoints "$SERVICE_NAME" -n "$NAMESPACE" 2>/dev/null || echo "No endpoints found"
@@ -89,14 +87,14 @@ if [ "$FOUND" = "false" ]; then
     echo ""
     echo "🔍 Searching across all namespaces..."
     ALL_MATCHES=$(kubectl get services --all-namespaces --no-headers | grep "$SERVICE_NAME" || true)
-    
+
     if [ -n "$ALL_MATCHES" ]; then
         echo "✅ Found matching services:"
         echo "$ALL_MATCHES"
         FOUND=true
     else
         echo "❌ Service '$SERVICE_NAME' not found in any namespace"
-        
+
         # Suggest similar services
         echo ""
         echo "💡 Similar service names found:"
@@ -114,19 +112,16 @@ else
     exit 1
 fi
             """,
-            "args": {
-                "SERVICE_NAME": "{{service_name}}",
-                "NAMESPACE": "{{namespace:default}}"
-            }
+            "args": {"SERVICE_NAME": "{{service_name}}", "NAMESPACE": "{{namespace:default}}"},
         }
-    
+
     @staticmethod
     def kubectl_cluster_investigation() -> Dict[str, Any]:
         """Comprehensive Kubernetes cluster investigation tool."""
         return {
             "name": "kubectl_cluster_investigation",
             "description": "Perform comprehensive Kubernetes cluster investigation for incident analysis",
-            "type": "docker", 
+            "type": "docker",
             "image": "bitnami/kubectl:latest",
             "content": """#!/bin/bash
 set -e
@@ -144,7 +139,7 @@ echo "📊 Node status:"
 kubectl get nodes -o wide
 
 echo ""
-echo "📊 Namespace overview:" 
+echo "📊 Namespace overview:"
 kubectl get namespaces
 
 echo ""
@@ -166,10 +161,10 @@ if [ "$SERVICES" != "all" ]; then
         service=$(echo "$service" | xargs)  # trim whitespace
         echo ""
         echo "🔍 Investigating service: $service"
-        
+
         # Find pods for this service
         kubectl get pods --all-namespaces -l app=$service -o wide 2>/dev/null || echo "No pods found with label app=$service"
-        
+
         # Check service endpoints
         kubectl get services --all-namespaces | grep "$service" || echo "Service $service not found"
     done
@@ -194,11 +189,9 @@ kubectl top pods --all-namespaces --sort-by=memory 2>/dev/null | head -10 || ech
 echo ""
 echo "✅ Cluster investigation completed"
             """,
-            "args": {
-                "AFFECTED_SERVICES": "{{affected_services}}"
-            }
+            "args": {"AFFECTED_SERVICES": "{{affected_services}}"},
         }
-    
+
     @staticmethod
     def helm_deployments_check() -> Dict[str, Any]:
         """Check recent Helm deployments."""
@@ -237,9 +230,9 @@ helm list --all-namespaces --output json | jq -r 'group_by(.status) | .[] | "\\(
 echo ""
 echo "✅ Helm analysis completed"
             """,
-            "args": {}
+            "args": {},
         }
-    
+
     @classmethod
     def get_all_tools(cls) -> List[Dict[str, Any]]:
         """Get all Kubernetes tools for agent configuration."""
